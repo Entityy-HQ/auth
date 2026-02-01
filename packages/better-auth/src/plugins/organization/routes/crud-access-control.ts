@@ -473,18 +473,24 @@ export const deleteOrgRole = <O extends OrganizationOptions>(options: O) => {
 			);
 
 			// Check if any members are assigned to this role
-			const membersInOrg = await ctx.context.adapter.findMany<Member>({
+			const roleToDelete = existingRoleInDB.role;
+			const members = await ctx.context.adapter.findMany<Member>({
 				model: "member",
 				where: [
 					{
 						field: "organizationId",
 						value: organizationId,
 						operator: "eq",
+						connector: "AND",
+					},
+					{
+						field: "role",
+						value: roleToDelete,
+						operator: "contains",
 					},
 				],
 			});
-			const roleToDelete = existingRoleInDB.role;
-			const memberWithRole = membersInOrg.find((member) => {
+			const memberWithRole = members.find((member) => {
 				const memberRoles = member.role.split(",").map((r) => r.trim());
 				return memberRoles.includes(roleToDelete);
 			});
