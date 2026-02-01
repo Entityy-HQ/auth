@@ -91,7 +91,7 @@ describe("bearer", async () => {
 	});
 
 	it.each([
-		["URL-encoded", (t: string) => t],
+		["Raw (already URL-encoded from header)", (t: string) => t],
 		["URL-decoded", (t: string) => decodeURIComponent(t)],
 	])("should work with %s token", async (_, transform) => {
 		const testToken = transform(token);
