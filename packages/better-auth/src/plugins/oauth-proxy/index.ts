@@ -16,7 +16,6 @@ import { parseGenericState } from "../../state";
 import type { Account, User } from "../../types";
 import { getOrigin } from "../../utils/url";
 import { OAUTH_PROXY_ERROR_CODES } from "./error-codes";
-import type { OAuthProxyStatePackage } from "./types";
 import {
 	checkSkipProxy,
 	redirectOnError,
@@ -61,12 +60,22 @@ export interface OAuthProxyOptions {
 }
 
 /**
+ * Encrypted state package for cross-origin OAuth proxy flow
+ * @internal
+ */
+type OAuthProxyStatePackage = {
+	state: string;
+	stateCookie: string;
+	isOAuthProxy: boolean;
+};
+
+/**
  * Passthrough payload containing OAuth profile data.
  * Used to transfer OAuth credentials from production to preview
  * without creating user/session on production.
  * @internal
  */
-interface PassthroughPayload {
+type PassthroughPayload = {
 	userInfo: Omit<User, "createdAt" | "updatedAt">;
 	account: Omit<Account, "id" | "userId" | "createdAt" | "updatedAt">;
 	state: string;
@@ -75,7 +84,7 @@ interface PassthroughPayload {
 	errorURL?: string;
 	disableSignUp?: boolean;
 	timestamp: number;
-}
+};
 
 const oauthProxyQuerySchema = z.object({
 	callbackURL: z.string().meta({
