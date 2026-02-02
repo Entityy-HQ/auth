@@ -660,7 +660,7 @@ describe("oauth-proxy", async () => {
 				{
 					onError(context) {
 						const location = context.response.headers.get("location");
-						expect(location).toContain("error=PAYLOAD_EXPIRED");
+						expect(location).toContain("error=payload_expired");
 					},
 				},
 			);
@@ -711,7 +711,7 @@ describe("oauth-proxy", async () => {
 				{
 					onError(context) {
 						const location = context.response.headers.get("location");
-						expect(location).toContain("error=PAYLOAD_EXPIRED");
+						expect(location).toContain("error=payload_expired");
 					},
 				},
 			);
@@ -836,7 +836,7 @@ describe("oauth-proxy", async () => {
 				{
 					onError(context) {
 						const location = context.response.headers.get("location");
-						expect(location).toContain("error=INVALID_PAYLOAD");
+						expect(location).toContain("error=invalid_payload");
 					},
 				},
 			);
@@ -863,7 +863,7 @@ describe("oauth-proxy", async () => {
 				{
 					onError(context) {
 						const location = context.response.headers.get("location");
-						expect(location).toContain("error=INVALID_PAYLOAD");
+						expect(location).toContain("error=invalid_payload");
 					},
 				},
 			);
@@ -896,7 +896,7 @@ describe("oauth-proxy", async () => {
 				{
 					onError(context) {
 						const location = context.response.headers.get("location");
-						expect(location).toContain("error=INVALID_PAYLOAD");
+						expect(location).toContain("error=invalid_payload");
 					},
 				},
 			);
