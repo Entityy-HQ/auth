@@ -1,6 +1,6 @@
 import { createAuthMiddleware } from "better-auth/api";
 import { magicLinkClient } from "better-auth/client/plugins";
-import { magicLink, oAuthProxy } from "better-auth/plugins";
+import { bearer, magicLink, oAuthProxy } from "better-auth/plugins";
 import { getTestInstance } from "better-auth/test";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { expo } from "../src";
@@ -297,6 +297,87 @@ describe("expo", async () => {
 			error: null,
 			isPending: false,
 		});
+	});
+
+	it("should delete session from database on sign out", async () => {
+		// Sign in first
+		await client.signIn.email({
+			email: testUser.email,
+			password: testUser.password,
+		});
+
+		// Get session and verify it exists
+		const sessionBefore = await client.getSession();
+		expect(sessionBefore.data?.session).toBeDefined();
+		const sessionId = sessionBefore.data?.session?.id!;
+		expect(sessionId).toBeDefined();
+
+		// Check session exists in database
+		const ctx = await auth.$context;
+		const sessionInDb = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionInDb).toBeDefined();
+
+		// Verify cookie is stored
+		const storedCookie = storage.get("better-auth_cookie");
+		expect(storedCookie).toBeDefined();
+		const parsedCookie = JSON.parse(storedCookie || "{}");
+		expect(parsedCookie["better-auth.session_token"]).toBeDefined();
+		expect(parsedCookie["better-auth.session_token"].value).toBeDefined();
+
+		// Sign out
+		const signOutRes = await client.signOut();
+		expect(signOutRes.data?.success).toBe(true);
+
+		// Check session is deleted from database
+		const sessionAfterSignOut = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionAfterSignOut).toBeNull();
+	});
+
+	it("should delete session from database on sign out even after multiple getSession calls", async () => {
+		// Sign in first
+		await client.signIn.email({
+			email: testUser.email,
+			password: testUser.password,
+		});
+
+		// Make multiple getSession calls to simulate real app usage
+		for (let i = 0; i < 3; i++) {
+			const session = await client.getSession();
+			expect(session.data?.session).toBeDefined();
+		}
+
+		const sessionBefore = await client.getSession();
+		const sessionId = sessionBefore.data?.session?.id!;
+		expect(sessionId).toBeDefined();
+
+		// Check session exists in database
+		const ctx = await auth.$context;
+		const sessionInDb = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionInDb).toBeDefined();
+
+		// Sign out
+		const signOutRes = await client.signOut();
+		expect(signOutRes.data?.success).toBe(true);
+
+		// Check session is deleted from database
+		const sessionAfterSignOut = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionAfterSignOut).toBeNull();
+
+		// Verify getSession returns null after sign out
+		const sessionAfter = await client.getSession();
+		expect(sessionAfter.data).toBeNull();
 	});
 
 	it("should modify origin header to expo origin if origin is not set", async () => {
@@ -915,5 +996,187 @@ describe("ExpoOnlineManager duplicate notification prevention", () => {
 
 		onlineManager.setOnline(true);
 		expect(listener).toHaveBeenCalledTimes(2);
+	});
+});
+
+describe("expo with async storage", async () => {
+	const storage = new Map<string, string>();
+
+	// Simulate async storage like AsyncStorage
+	const asyncStorage = {
+		getItem: async (key: string): Promise<string | null> => {
+			// Add a small delay to simulate async operation
+			await new Promise((resolve) => setTimeout(resolve, 1));
+			return storage.get(key) || null;
+		},
+		setItem: async (key: string, value: string): Promise<void> => {
+			await new Promise((resolve) => setTimeout(resolve, 1));
+			storage.set(key, value);
+		},
+	};
+
+	const { auth, client, testUser } = await getTestInstance(
+		{
+			emailAndPassword: {
+				enabled: true,
+			},
+			plugins: [expo()],
+			trustedOrigins: ["better-auth://"],
+		},
+		{
+			clientOptions: {
+				plugins: [
+					expoClient({
+						// Use async storage (simulating AsyncStorage)
+						storage: asyncStorage as any,
+					}),
+				],
+			},
+		},
+	);
+
+	it("should delete session from database on sign out with async storage", async () => {
+		// Sign in first
+		await client.signIn.email({
+			email: testUser.email,
+			password: testUser.password,
+		});
+
+		// Get session and verify it exists
+		const sessionBefore = await client.getSession();
+		expect(sessionBefore.data?.session).toBeDefined();
+		const sessionId = sessionBefore.data?.session?.id!;
+		expect(sessionId).toBeDefined();
+
+		// Check session exists in database
+		const ctx = await auth.$context;
+		const sessionInDb = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionInDb).toBeDefined();
+
+		// Sign out
+		const signOutRes = await client.signOut();
+		expect(signOutRes.data?.success).toBe(true);
+
+		// Check session is deleted from database
+		const sessionAfterSignOut = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionAfterSignOut).toBeNull();
+	});
+});
+
+describe("expo with bearer plugin", async () => {
+	const storage = new Map<string, string>();
+
+	const { auth, client, testUser } = await getTestInstance(
+		{
+			emailAndPassword: {
+				enabled: true,
+			},
+			plugins: [expo(), bearer()],
+			trustedOrigins: ["better-auth://"],
+		},
+		{
+			clientOptions: {
+				plugins: [
+					expoClient({
+						storage: {
+							getItem: (key) => storage.get(key) || null,
+							setItem: async (key, value) => storage.set(key, value),
+						},
+					}),
+				],
+			},
+		},
+	);
+
+	it("should delete session from database on sign out with bearer plugin", async () => {
+		// Sign in first
+		await client.signIn.email({
+			email: testUser.email,
+			password: testUser.password,
+		});
+
+		// Get session and verify it exists
+		const sessionBefore = await client.getSession();
+		expect(sessionBefore.data?.session).toBeDefined();
+		const sessionId = sessionBefore.data?.session?.id!;
+		expect(sessionId).toBeDefined();
+
+		// Check session exists in database
+		const ctx = await auth.$context;
+		const sessionInDb = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionInDb).toBeDefined();
+
+		// Sign out
+		const signOutRes = await client.signOut();
+		expect(signOutRes.data?.success).toBe(true);
+
+		// Check session is deleted from database
+		const sessionAfterSignOut = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionAfterSignOut).toBeNull();
+	});
+
+	it("should delete session when using bearer token for sign-out", async () => {
+		// Sign in and get bearer token
+		let bearerToken = "";
+		await client.signIn.email(
+			{
+				email: testUser.email,
+				password: testUser.password,
+			},
+			{
+				onSuccess: (ctx) => {
+					bearerToken = ctx.response.headers.get("set-auth-token") || "";
+				},
+			},
+		);
+		expect(bearerToken).toBeTruthy();
+
+		// Get session using bearer token
+		const sessionBefore = await client.getSession({
+			fetchOptions: {
+				headers: {
+					Authorization: `Bearer ${bearerToken}`,
+				},
+			},
+		});
+		expect(sessionBefore.data?.session).toBeDefined();
+		const sessionId = sessionBefore.data?.session?.id!;
+		expect(sessionId).toBeDefined();
+
+		// Check session exists in database
+		const ctx = await auth.$context;
+		const sessionInDb = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionInDb).toBeDefined();
+
+		// Sign out using bearer token (not cookie)
+		const signOutRes = await client.$fetch("/sign-out", {
+			method: "POST",
+			headers: {
+				Authorization: `Bearer ${bearerToken}`,
+			},
+		});
+		expect((signOutRes.data as { success: boolean })?.success).toBe(true);
+
+		// Check session is deleted from database
+		const sessionAfterSignOut = await ctx.adapter.findOne({
+			model: "session",
+			where: [{ field: "id", value: sessionId }],
+		});
+		expect(sessionAfterSignOut).toBeNull();
 	});
 });

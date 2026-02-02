@@ -324,7 +324,10 @@ export const expoClient = (opts: ExpoClientOptions) => {
 							// Only process and notify if the Set-Cookie header contains better-auth cookies
 							// This prevents infinite refetching when other cookies (like Cloudflare's __cf_bm) are present
 							if (hasBetterAuthCookies(setCookie, cookiePrefix)) {
-								const prevCookie = storage.getItem(cookieName);
+								// Support both sync and async storage implementations
+								const prevCookie = await Promise.resolve(
+									storage.getItem(cookieName),
+								);
 								const toSetCookie = getSetCookie(
 									setCookie || "",
 									prevCookie ?? undefined,
@@ -377,7 +380,10 @@ export const expoClient = (opts: ExpoClientOptions) => {
 								} catch {}
 							}
 
-							const storedCookieJson = storage.getItem(cookieName);
+							// Support both sync and async storage implementations
+							const storedCookieJson = await Promise.resolve(
+								storage.getItem(cookieName),
+							);
 							const oauthStateValue = getOAuthStateValue(
 								storedCookieJson,
 								cookiePrefix,
@@ -398,7 +404,10 @@ export const expoClient = (opts: ExpoClientOptions) => {
 							const url = new URL(result.url);
 							const cookie = url.searchParams.get("cookie");
 							if (!cookie) return;
-							const prevCookie = storage.getItem(cookieName);
+							// Support both sync and async storage implementations
+							const prevCookie = await Promise.resolve(
+								storage.getItem(cookieName),
+							);
 							const toSetCookie = getSetCookie(cookie, prevCookie ?? undefined);
 							storage.setItem(cookieName, toSetCookie);
 							store?.notify("$sessionSignal");
@@ -413,7 +422,10 @@ export const expoClient = (opts: ExpoClientOptions) => {
 						};
 					}
 					options = options || {};
-					const storedCookie = storage.getItem(cookieName);
+					// Support both sync and async storage implementations
+					const storedCookie = await Promise.resolve(
+						storage.getItem(cookieName),
+					);
 					const cookie = getCookie(storedCookie || "{}");
 					options.credentials = "omit";
 					options.headers = {
