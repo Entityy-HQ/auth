@@ -206,6 +206,13 @@ export const oAuthProxy = <O extends OAuthProxyOptions>(opts?: O) => {
 						throw redirectOnError(ctx, errorURL, "payload_expired");
 					}
 
+					// Clean up OAuth state
+					try {
+						await parseGenericState(ctx, payload.state);
+					} catch (e) {
+						ctx.context.logger.warn("Failed to clean up OAuth state", e);
+					}
+
 					const result = await handleOAuthUserInfo(ctx, {
 						userInfo: payload.userInfo,
 						account: payload.account,
@@ -221,12 +228,6 @@ export const oAuthProxy = <O extends OAuthProxyOptions>(opts?: O) => {
 					}
 
 					await setSessionCookie(ctx, result.data);
-
-					try {
-						await parseGenericState(ctx, payload.state);
-					} catch (e) {
-						ctx.context.logger.warn("Failed to clean up OAuth state", e);
-					}
 
 					// Redirect to final callback URL
 					const finalURL = result.isRegister
