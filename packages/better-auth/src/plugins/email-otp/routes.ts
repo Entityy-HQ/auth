@@ -113,6 +113,9 @@ export const sendVerificationOTP = (opts: RequiredEmailOTPOptions) =>
 							if (ctx.body.type === "sign-in" && !opts.disableSignUp) {
 								// allow
 							} else {
+								await ctx.context.internalAdapter.deleteVerificationValue(
+									existing.id,
+								);
 								return ctx.json({
 									success: true,
 								});

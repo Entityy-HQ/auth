@@ -590,6 +590,55 @@ describe("email-otp-persistOTP", async () => {
 
 		expect(secondOtp).toBe(firstOtp);
 	});
+
+	it("should delete verification in persistOTP path when user does not exist", async () => {
+		const codes: string[] = [];
+		const { client: testClient, auth: testAuth } = await getTestInstance(
+			{
+				plugins: [
+					emailOTP({
+						async sendVerificationOTP({ otp }) {
+							codes.push(otp);
+						},
+						persistOTP: true,
+					}),
+				],
+			},
+			{
+				clientOptions: {
+					plugins: [emailOTPClient()],
+				},
+			},
+		);
+		const authCtx = await testAuth.$context;
+		const testEmail = `delete-test-${Date.now()}@example.com`;
+		const identifier = `email-verification-otp-${testEmail}`;
+
+		// Manually create a verification for a non-existent user
+		await authCtx.internalAdapter.createVerificationValue({
+			identifier,
+			value: "123456:0",
+			expiresAt: new Date(Date.now() + 1000 * 60 * 5),
+		});
+
+		// Verify it was created
+		const before =
+			await authCtx.internalAdapter.findVerificationValue(identifier);
+		expect(before).not.toBeNull();
+
+		// Request OTP - should find existing via persistOTP, but user doesn't exist
+		// so it should delete the verification
+		await testClient.emailOtp.sendVerificationOtp({
+			email: testEmail,
+			type: "email-verification",
+		});
+		expect(codes.length).toBe(0); // OTP not sent for non-existent user
+
+		// Verify verification was deleted
+		const after =
+			await authCtx.internalAdapter.findVerificationValue(identifier);
+		expect(after).toBeNull();
+	});
 });
 
 describe("email-otp-verify", async () => {
