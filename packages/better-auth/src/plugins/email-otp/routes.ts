@@ -162,7 +162,7 @@ export const sendVerificationOTP = (opts: RequiredEmailOTPOptions) =>
 						expiresAt: getDate(opts.expiresIn, "sec"),
 					});
 				});
-				
+
 			const user = await ctx.context.internalAdapter.findUserByEmail(email);
 			if (!user) {
 				if (ctx.body.type === "sign-in" && !opts.disableSignUp) {
