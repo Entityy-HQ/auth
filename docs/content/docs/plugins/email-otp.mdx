@@ -338,3 +338,15 @@ emailOTP({
     }
 })
 ```
+
+- `persistOTP`: Resend existing OTP with extended expiry instead of generating a new one. Useful when emails are delayed and users request multiple codes, thus all emails will contain the same OTP. Defaults to `false`.
+
+```ts title="auth.ts"
+emailOTP({
+    persistOTP: true
+})
+```
+
+<Callout>
+`persistOTP` is ignored when `storeOTP` is `hashed` or uses a custom hasher, since the original OTP cannot be recovered and a new OTP will always be generated.
+</Callout>
