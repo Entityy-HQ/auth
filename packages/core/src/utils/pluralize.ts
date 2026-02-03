@@ -1,5 +1,6 @@
 // This logic is originally from the `pluralize`
 // https://github.com/blakeembrey/pluralize
+/* cspell:disable */
 
 type Rule = [RegExp, string];
 
