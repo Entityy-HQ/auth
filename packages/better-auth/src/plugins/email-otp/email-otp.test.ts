@@ -404,6 +404,7 @@ describe("email-otp-persistOTP", async () => {
 			type: "email-verification",
 		});
 		const secondOtp = sentCodes[1];
+		expect(secondOtp).toBeDefined();
 		expect(secondOtp).toBe(firstOtp);
 
 		// Verify with the OTP
@@ -434,6 +435,7 @@ describe("email-otp-persistOTP", async () => {
 		const secondOtp = sentCodes[1];
 
 		// Should be different since first one expired
+		expect(secondOtp).toBeDefined();
 		expect(secondOtp).not.toBe(firstOtp);
 		vi.useRealTimers();
 	});
@@ -474,6 +476,7 @@ describe("email-otp-persistOTP", async () => {
 		});
 		const secondOtp = hashedCodes[1];
 
+		expect(secondOtp).toBeDefined();
 		expect(secondOtp).not.toBe(firstOtp);
 	});
 
@@ -512,6 +515,7 @@ describe("email-otp-persistOTP", async () => {
 		});
 		const secondOtp = customHashCodes[1];
 
+		expect(secondOtp).toBeDefined();
 		expect(secondOtp).not.toBe(firstOtp);
 	});
 
@@ -548,6 +552,7 @@ describe("email-otp-persistOTP", async () => {
 		});
 		const secondOtp = encryptedCodes[1];
 
+		expect(secondOtp).toBeDefined();
 		expect(secondOtp).toBe(firstOtp);
 	});
 
@@ -588,6 +593,7 @@ describe("email-otp-persistOTP", async () => {
 		});
 		const secondOtp = customEncCodes[1];
 
+		expect(secondOtp).toBeDefined();
 		expect(secondOtp).toBe(firstOtp);
 	});
 
