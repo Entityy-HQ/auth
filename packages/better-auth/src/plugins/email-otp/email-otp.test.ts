@@ -368,13 +368,13 @@ describe("email-otp", async () => {
 });
 
 describe("email-otp-persistOTP", async () => {
-	const otps: string[] = [];
+	const sentCodes: string[] = [];
 	const { client, testUser } = await getTestInstance(
 		{
 			plugins: [
 				emailOTP({
 					async sendVerificationOTP({ otp }) {
-						otps.push(otp);
+						sentCodes.push(otp);
 					},
 					persistOTP: true,
 				}),
@@ -388,14 +388,14 @@ describe("email-otp-persistOTP", async () => {
 	);
 
 	it("should reuse existing OTP when persistOTP is enabled", async () => {
-		otps.length = 0;
+		sentCodes.length = 0;
 
 		// First request
 		await client.emailOtp.sendVerificationOtp({
 			email: testUser.email,
 			type: "email-verification",
 		});
-		const firstOtp = otps[0];
+		const firstOtp = sentCodes[0];
 		expect(firstOtp).toBeDefined();
 
 		// Second request - should get same OTP
@@ -403,7 +403,7 @@ describe("email-otp-persistOTP", async () => {
 			email: testUser.email,
 			type: "email-verification",
 		});
-		const secondOtp = otps[1];
+		const secondOtp = sentCodes[1];
 		expect(secondOtp).toBe(firstOtp);
 
 		// Verify with the OTP
@@ -415,13 +415,13 @@ describe("email-otp-persistOTP", async () => {
 	});
 
 	it("should generate new OTP after previous one expires", async () => {
-		otps.length = 0;
+		sentCodes.length = 0;
 
 		await client.emailOtp.sendVerificationOtp({
 			email: testUser.email,
 			type: "sign-in",
 		});
-		const firstOtp = otps[0];
+		const firstOtp = sentCodes[0];
 
 		// Expire the OTP
 		vi.useFakeTimers();
@@ -431,7 +431,7 @@ describe("email-otp-persistOTP", async () => {
 			email: testUser.email,
 			type: "sign-in",
 		});
-		const secondOtp = otps[1];
+		const secondOtp = sentCodes[1];
 
 		// Should be different since first one expired
 		expect(secondOtp).not.toBe(firstOtp);
@@ -439,14 +439,14 @@ describe("email-otp-persistOTP", async () => {
 	});
 
 	it("should generate new OTP when persistOTP is true but storeOTP is hashed", async () => {
-		const hashedOtps: string[] = [];
+		const hashedCodes: string[] = [];
 		const { client: hashedClient, testUser: hashedUser } =
 			await getTestInstance(
 				{
 					plugins: [
 						emailOTP({
 							async sendVerificationOTP({ otp }) {
-								hashedOtps.push(otp);
+								hashedCodes.push(otp);
 							},
 							persistOTP: true,
 							storeOTP: "hashed",
@@ -465,26 +465,26 @@ describe("email-otp-persistOTP", async () => {
 			email: hashedUser.email,
 			type: "email-verification",
 		});
-		const firstOtp = hashedOtps[0];
+		const firstOtp = hashedCodes[0];
 
 		// Second request - should get NEW OTP since hashed OTP cannot be retrieved
 		await hashedClient.emailOtp.sendVerificationOtp({
 			email: hashedUser.email,
 			type: "email-verification",
 		});
-		const secondOtp = hashedOtps[1];
+		const secondOtp = hashedCodes[1];
 
 		expect(secondOtp).not.toBe(firstOtp);
 	});
 
 	it("should generate new OTP when persistOTP is true but storeOTP is custom hash", async () => {
-		const customHashOtps: string[] = [];
+		const customHashCodes: string[] = [];
 		const { client: hashClient, testUser: hashUser } = await getTestInstance(
 			{
 				plugins: [
 					emailOTP({
 						async sendVerificationOTP({ otp }) {
-							customHashOtps.push(otp);
+							customHashCodes.push(otp);
 						},
 						persistOTP: true,
 						storeOTP: {
@@ -504,25 +504,25 @@ describe("email-otp-persistOTP", async () => {
 			email: hashUser.email,
 			type: "email-verification",
 		});
-		const firstOtp = customHashOtps[0];
+		const firstOtp = customHashCodes[0];
 
 		await hashClient.emailOtp.sendVerificationOtp({
 			email: hashUser.email,
 			type: "email-verification",
 		});
-		const secondOtp = customHashOtps[1];
+		const secondOtp = customHashCodes[1];
 
 		expect(secondOtp).not.toBe(firstOtp);
 	});
 
 	it("should reuse OTP when persistOTP is true and storeOTP is encrypted", async () => {
-		const encryptedOtps: string[] = [];
+		const encryptedCodes: string[] = [];
 		const { client: encClient, testUser: encUser } = await getTestInstance(
 			{
 				plugins: [
 					emailOTP({
 						async sendVerificationOTP({ otp }) {
-							encryptedOtps.push(otp);
+							encryptedCodes.push(otp);
 						},
 						persistOTP: true,
 						storeOTP: "encrypted",
@@ -540,26 +540,26 @@ describe("email-otp-persistOTP", async () => {
 			email: encUser.email,
 			type: "email-verification",
 		});
-		const firstOtp = encryptedOtps[0];
+		const firstOtp = encryptedCodes[0];
 
 		await encClient.emailOtp.sendVerificationOtp({
 			email: encUser.email,
 			type: "email-verification",
 		});
-		const secondOtp = encryptedOtps[1];
+		const secondOtp = encryptedCodes[1];
 
 		expect(secondOtp).toBe(firstOtp);
 	});
 
 	it("should reuse OTP when persistOTP is true and storeOTP is custom encrypt/decrypt", async () => {
-		const customEncOtps: string[] = [];
+		const customEncCodes: string[] = [];
 		const { client: customEncClient, testUser: customEncUser } =
 			await getTestInstance(
 				{
 					plugins: [
 						emailOTP({
 							async sendVerificationOTP({ otp }) {
-								customEncOtps.push(otp);
+								customEncCodes.push(otp);
 							},
 							persistOTP: true,
 							storeOTP: {
@@ -580,13 +580,13 @@ describe("email-otp-persistOTP", async () => {
 			email: customEncUser.email,
 			type: "email-verification",
 		});
-		const firstOtp = customEncOtps[0];
+		const firstOtp = customEncCodes[0];
 
 		await customEncClient.emailOtp.sendVerificationOtp({
 			email: customEncUser.email,
 			type: "email-verification",
 		});
-		const secondOtp = customEncOtps[1];
+		const secondOtp = customEncCodes[1];
 
 		expect(secondOtp).toBe(firstOtp);
 	});
