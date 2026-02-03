@@ -7,7 +7,7 @@ import { setCookieCache, setSessionCookie } from "../../cookies";
 import { generateRandomString, symmetricDecrypt } from "../../crypto";
 import { parseUserOutput } from "../../db/schema";
 import { getDate } from "../../utils/date";
-import { storeOTP, verifyStoredOTP } from "./otp-token";
+import { retrieveOTP, storeOTP, verifyStoredOTP } from "./otp-token";
 import type { EmailOTPOptions } from "./types";
 import { splitAtLastColon } from "./utils";
 
@@ -88,30 +88,81 @@ export const sendVerificationOTP = (opts: RequiredEmailOTPOptions) =>
 			if (!isValidEmail.success) {
 				throw APIError.from("BAD_REQUEST", BASE_ERROR_CODES.INVALID_EMAIL);
 			}
-			const otp =
+
+			const identifier = `${ctx.body.type}-otp-${email}`;
+			let otp: string;
+
+			// Check for existing valid OTP when persistOTP is enabled
+			if (opts.persistOTP) {
+				const existing =
+					await ctx.context.internalAdapter.findVerificationValue(identifier);
+				if (existing && existing.expiresAt > new Date()) {
+					const [storedOtp] = splitAtLastColon(existing.value);
+					const retrievedOtp = await retrieveOTP(ctx, opts, storedOtp);
+					if (retrievedOtp) {
+						// Extend expiry and reuse existing OTP
+						await ctx.context.internalAdapter.updateVerificationValue(
+							existing.id,
+							{ expiresAt: getDate(opts.expiresIn, "sec") },
+						);
+						otp = retrievedOtp;
+
+						const user =
+							await ctx.context.internalAdapter.findUserByEmail(email);
+						if (!user) {
+							if (ctx.body.type === "sign-in" && !opts.disableSignUp) {
+								// allow
+							} else {
+								return ctx.json({
+									success: true,
+								});
+							}
+						}
+
+						await ctx.context.runInBackgroundOrAwait(
+							opts.sendVerificationOTP(
+								{
+									email,
+									otp,
+									type: ctx.body.type,
+								},
+								ctx,
+							),
+						);
+						return ctx.json({
+							success: true,
+						});
+					}
+					ctx.context.logger.warn(
+						"persistOTP is enabled but OTP cannot be retrieved (storeOTP is hashed). Generating new OTP.",
+					);
+				}
+			}
+
+			// Generate new OTP
+			otp =
 				opts.generateOTP({ email, type: ctx.body.type }, ctx) ||
 				defaultOTPGenerator(opts);
-
 			const storedOTP = await storeOTP(ctx, opts, otp);
 
 			await ctx.context.internalAdapter
 				.createVerificationValue({
 					value: `${storedOTP}:0`,
-					identifier: `${ctx.body.type}-otp-${email}`,
+					identifier,
 					expiresAt: getDate(opts.expiresIn, "sec"),
 				})
-				.catch(async (error) => {
+				.catch(async () => {
 					// might be duplicate key error
 					await ctx.context.internalAdapter.deleteVerificationByIdentifier(
-						`${ctx.body.type}-otp-${email}`,
+						identifier,
 					);
-					//try again
 					await ctx.context.internalAdapter.createVerificationValue({
 						value: `${storedOTP}:0`,
-						identifier: `${ctx.body.type}-otp-${email}`,
+						identifier,
 						expiresAt: getDate(opts.expiresIn, "sec"),
 					});
 				});
+				
 			const user = await ctx.context.internalAdapter.findUserByEmail(email);
 			if (!user) {
 				if (ctx.body.type === "sign-in" && !opts.disableSignUp) {

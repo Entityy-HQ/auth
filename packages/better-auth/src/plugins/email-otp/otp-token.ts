@@ -59,3 +59,26 @@ export async function verifyStoredOTP(
 
 	return constantTimeEqual(otp, storedOtp);
 }
+
+export async function retrieveOTP(
+	ctx: GenericEndpointContext,
+	opts: EmailOTPOptions,
+	storedOtp: string,
+): Promise<string | null> {
+	if (opts.storeOTP === "encrypted") {
+		return await symmetricDecrypt({
+			key: ctx.context.secret,
+			data: storedOtp,
+		});
+	}
+	if (opts.storeOTP === "hashed") {
+		return null; // Cannot recover hashed OTP
+	}
+	if (typeof opts.storeOTP === "object" && "hash" in opts.storeOTP) {
+		return null; // Cannot recover custom hashed OTP
+	}
+	if (typeof opts.storeOTP === "object" && "decrypt" in opts.storeOTP) {
+		return await opts.storeOTP.decrypt(storedOtp);
+	}
+	return storedOtp; // Plain OTP
+}

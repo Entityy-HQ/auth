@@ -79,4 +79,12 @@ export interface EmailOTPOptions {
 	 * @default false
 	 */
 	overrideDefaultEmailVerification?: boolean | undefined;
+	/**
+	 * Resend existing OTP with extended expiry instead of generating a new one.
+	 *
+	 * Ignored when storeOTP is "hashed" since OTP cannot be recovered.
+	 *
+	 * @default false
+	 */
+	persistOTP?: boolean | undefined;
 }
