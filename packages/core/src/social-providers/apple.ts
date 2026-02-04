@@ -162,15 +162,14 @@ export const apple = (options: AppleOptions) => {
 				return null;
 			}
 
-			// TODO: " " masking will be removed when the name field is made optional
 			let name: string;
 			if (token.user?.name) {
 				const firstName = token.user.name.firstName || "";
 				const lastName = token.user.name.lastName || "";
 				const fullName = `${firstName} ${lastName}`.trim();
-				name = fullName || " ";
+				name = fullName;
 			} else {
-				name = profile.name || " ";
+				name = profile.name || "";
 			}
 
 			const emailVerified =
