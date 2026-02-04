@@ -1681,8 +1681,8 @@ describe("Microsoft Provider", async () => {
 
 	it("should support id token sign in", async () => {
 		const microsoftProfile: Partial<MicrosoftEntraIDProfile> = {
-			sub: "ms-idtoken-user-789",
-			email: "idtokenuser@outlook.com",
+			sub: "ms-id-token-user-789",
+			email: "id-tokenuser@outlook.com",
 			name: "IdToken User",
 			oid: "ms-oid-789",
 			tid: "ms-tenant-789",
@@ -1693,7 +1693,7 @@ describe("Microsoft Provider", async () => {
 		)
 			.setProtectedHeader({ alg: "RS256", kid: msKid })
 			.setIssuedAt()
-			.setAudience("test-ms-client-idtoken")
+			.setAudience("test-ms-client-id-token")
 			.setExpirationTime("1h")
 			.sign(rsaKeyPair.privateKey);
 
@@ -1715,8 +1715,8 @@ describe("Microsoft Provider", async () => {
 			{
 				socialProviders: {
 					microsoft: {
-						clientId: "test-ms-client-idtoken",
-						clientSecret: "test-ms-secret-idtoken",
+						clientId: "test-ms-client-id-token",
+						clientSecret: "test-ms-secret-id-token",
 					},
 				},
 			},
@@ -1740,7 +1740,7 @@ describe("Microsoft Provider", async () => {
 			user: { email: string; name: string };
 		};
 		expect(data.token).toBeDefined();
-		expect(data.user.email).toBe("idtokenuser@outlook.com");
+		expect(data.user.email).toBe("id-tokenuser@outlook.com");
 		expect(data.user.name).toBe("IdToken User");
 	});
 
