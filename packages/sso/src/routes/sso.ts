@@ -2200,6 +2200,7 @@ export const callbackSSOSAML = (options?: SSOOptions) => {
 						.filter(Boolean)
 						.join(" ") ||
 					attributes[mapping.name || "displayName"] ||
+					extract.nameID ||
 					"",
 				emailVerified:
 					options?.trustEmailVerified && mapping.emailVerified
@@ -2662,6 +2663,7 @@ export const acsEndpoint = (options?: SSOOptions) => {
 						.filter(Boolean)
 						.join(" ") ||
 					attributes[mapping.name || "displayName"] ||
+					extract.nameID ||
 					"",
 				emailVerified:
 					options?.trustEmailVerified && mapping.emailVerified

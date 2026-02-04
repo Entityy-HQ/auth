@@ -96,7 +96,7 @@ export const naver = (options: NaverOptions) => {
 			const res = profile.response || {};
 			const user = {
 				id: res.id,
-				name: res.name || "",
+				name: res.name || res.nickname || "",
 				email: res.email,
 				image: res.profile_image,
 				emailVerified: false,
