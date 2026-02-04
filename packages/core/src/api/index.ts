@@ -49,8 +49,8 @@ type AuthMiddleware2 = (...args: any[]) => Promise<any>;
 
 type AuthEndpointOptions<
 	Method extends string,
-	Query extends object,
-	Body extends object,
+	Query,
+	Body,
 	Middleware extends AuthMiddleware2[]
 > = {
 	method: Method | Method[];
@@ -84,8 +84,8 @@ type AuthEndpointContext<
 export interface AuthEndpointV2<
 	Path extends string,
 	Method extends string,
-	Query extends object,
-	Body extends object,
+	Query,
+	Body,
 	Middleware extends AuthMiddleware2[]
 > {
 	(context: AuthEndpointContext<Path, Method, Query, Body, Middleware>): Promise<any>
@@ -94,15 +94,22 @@ export interface AuthEndpointV2<
 export function createAuthEndpointV2 <
 	Path extends string,
 	Method extends string,
-	Query extends object,
-	Body extends object,
+	Query,
+	Body,
 	const Middleware extends AuthMiddleware2[]
 >(
 	path: Path,
 	options: AuthEndpointOptions<Method, Query, Body, Middleware>,
-	handler: (context: AuthEndpointContext<Path, Method, Query, Body, Middleware>) => Promise<any>
+	handler: (context: AuthEndpointContext<Path, Method, NoInfer<Query>, NoInfer<Body>, Middleware>) => Promise<any>
 ): AuthEndpointV2<Path, Method, Query, Body, Middleware> {
-	return null! as any
+	return createEndpoint(
+		path,
+		{
+			...options,
+			use: [...(options?.use || []), ...use],
+		} as any,
+		async (ctx) => runWithEndpointContext(ctx as any, () => handler(ctx as any)),
+	) as any;
 }
 
 export function createAuthEndpoint<
