@@ -6,6 +6,7 @@ import type {
 import { createEndpoint, createMiddleware } from "better-call";
 import { runWithEndpointContext } from "../context";
 import type { AuthContext } from "../types";
+import type { StandardSchemaV1 } from '@standard-schema/spec'
 
 export const optionsMiddleware = createMiddleware(async () => {
 	/**
@@ -38,6 +39,71 @@ type EndpointHandler<
 	Options extends EndpointOptions,
 	R,
 > = (context: EndpointContext<Path, Options, AuthContext>) => Promise<R>;
+
+type DefaultAuthContext = AuthContext & {
+	returned?: unknown | undefined;
+	responseHeaders?: Headers | undefined;
+} & Record<string, any>
+
+type AuthMiddleware2 = (...args: any[]) => Promise<any>;
+
+type AuthEndpointOptions<
+	Method extends string,
+	Query extends object,
+	Body extends object,
+	Middleware extends AuthMiddleware2[]
+> = {
+	method: Method | Method[];
+	query?: StandardSchemaV1<Query>
+	body?: StandardSchemaV1<Body>
+	use: Middleware
+} & Record<string, unknown>
+
+type InferAuthMiddleware2Returns<Middleware extends AuthMiddleware2[]> =
+	Middleware extends [infer First, ...infer Rest]
+		? First extends (...args: any[]) => infer R
+			? Rest extends AuthMiddleware2[] ? Awaited<R> & InferAuthMiddleware2Returns<Rest>
+				: Awaited<R>
+			: never
+		: {}
+
+type AuthEndpointContext<
+	Path extends string,
+	Method extends string,
+	Query,
+	Body,
+	Middleware extends AuthMiddleware2[]
+> = {
+	path: Path;
+	method: Method | Method[];
+	query?: Query
+	body?: Body
+	context: InferAuthMiddleware2Returns<Middleware> & DefaultAuthContext
+}
+
+export interface AuthEndpointV2<
+	Path extends string,
+	Method extends string,
+	Query extends object,
+	Body extends object,
+	Middleware extends AuthMiddleware2[]
+> {
+	(context: AuthEndpointContext<Path, Method, Query, Body, Middleware>): Promise<any>
+}
+
+export function createAuthEndpointV2 <
+	Path extends string,
+	Method extends string,
+	Query extends object,
+	Body extends object,
+	const Middleware extends AuthMiddleware2[]
+>(
+	path: Path,
+	options: AuthEndpointOptions<Method, Query, Body, Middleware>,
+	handler: (context: AuthEndpointContext<Path, Method, Query, Body, Middleware>) => Promise<any>
+): AuthEndpointV2<Path, Method, Query, Body, Middleware> {
+	return null! as any
+}
 
 export function createAuthEndpoint<
 	Path extends string,

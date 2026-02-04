@@ -1,4 +1,4 @@
-import { createAuthEndpoint } from "@better-auth/core/api";
+import { createAuthEndpoint, createAuthEndpointV2 } from "@better-auth/core/api";
 import type { Account } from "@better-auth/core/db";
 import { APIError, BASE_ERROR_CODES } from "@better-auth/core/error";
 import type { OAuth2Tokens } from "@better-auth/core/oauth2";
@@ -18,10 +18,13 @@ import {
 	sessionMiddleware,
 } from "./session";
 
-export const listUserAccounts = createAuthEndpoint(
+export const listUserAccounts = createAuthEndpointV2(
 	"/list-accounts",
 	{
 		method: "GET",
+		query: z.object({
+			sortBy: z.string().optional(),
+		}),
 		use: [sessionMiddleware],
 		metadata: {
 			openapi: {
@@ -87,6 +90,7 @@ export const listUserAccounts = createAuthEndpoint(
 		const accounts = await c.context.internalAdapter.findAccounts(
 			session.user.id,
 		);
+		// @ts-expect-error
 		return c.json(
 			accounts.map((a) => {
 				const { scope, ...parsed } = parseAccountOutput(c.context.options, a);
