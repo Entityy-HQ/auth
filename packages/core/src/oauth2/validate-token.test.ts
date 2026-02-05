@@ -171,4 +171,97 @@ describe("validateToken", () => {
 			validateToken(token, "https://example.com/.well-known/jwks"),
 		).rejects.toBeDefined();
 	});
+
+	it("should verify token with matching audience", async () => {
+		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
+		const token = await createSignedToken(privateKey, "RS256", kid);
+
+		mockedBetterFetch.mockResolvedValueOnce({
+			data: { keys: [publicJWK] },
+			error: null,
+		});
+
+		const result = await validateToken(
+			token,
+			"https://example.com/.well-known/jwks",
+			{ audience: "test-client" },
+		);
+
+		expect(result).toBeDefined();
+		expect(result.payload.aud).toBe("test-client");
+	});
+
+	it("should reject token with mismatched audience", async () => {
+		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
+		const token = await createSignedToken(privateKey, "RS256", kid);
+
+		mockedBetterFetch.mockResolvedValueOnce({
+			data: { keys: [publicJWK] },
+			error: null,
+		});
+
+		await expect(
+			validateToken(token, "https://example.com/.well-known/jwks", {
+				audience: "wrong-client",
+			}),
+		).rejects.toThrow();
+	});
+
+	it("should verify token with matching issuer", async () => {
+		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
+		const token = await createSignedToken(privateKey, "RS256", kid);
+
+		mockedBetterFetch.mockResolvedValueOnce({
+			data: { keys: [publicJWK] },
+			error: null,
+		});
+
+		const result = await validateToken(
+			token,
+			"https://example.com/.well-known/jwks",
+			{ issuer: "https://example.com" },
+		);
+
+		expect(result).toBeDefined();
+		expect(result.payload.iss).toBe("https://example.com");
+	});
+
+	it("should reject token with mismatched issuer", async () => {
+		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
+		const token = await createSignedToken(privateKey, "RS256", kid);
+
+		mockedBetterFetch.mockResolvedValueOnce({
+			data: { keys: [publicJWK] },
+			error: null,
+		});
+
+		await expect(
+			validateToken(token, "https://example.com/.well-known/jwks", {
+				issuer: "https://wrong-issuer.com",
+			}),
+		).rejects.toThrow();
+	});
+
+	it("should verify token with both audience and issuer", async () => {
+		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
+		const token = await createSignedToken(privateKey, "RS256", kid);
+
+		mockedBetterFetch.mockResolvedValueOnce({
+			data: { keys: [publicJWK] },
+			error: null,
+		});
+
+		const result = await validateToken(
+			token,
+			"https://example.com/.well-known/jwks",
+			{
+				audience: "test-client",
+				issuer: "https://example.com",
+			},
+		);
+
+		expect(result).toBeDefined();
+		expect(result.payload.aud).toBe("test-client");
+		expect(result.payload.iss).toBe("https://example.com");
+	});
 });

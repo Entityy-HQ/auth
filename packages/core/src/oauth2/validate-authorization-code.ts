@@ -164,7 +164,14 @@ export async function validateAuthorizationCode({
 	return tokens;
 }
 
-export async function validateToken(token: string, jwksEndpoint: string) {
+export async function validateToken(
+	token: string,
+	jwksEndpoint: string,
+	options?: {
+		audience?: string | string[];
+		issuer?: string | string[];
+	},
+) {
 	const { data, error } = await betterFetch<{
 		keys: JWK[];
 	}>(jwksEndpoint, {
@@ -183,6 +190,9 @@ export async function validateToken(token: string, jwksEndpoint: string) {
 		throw new Error("Key not found");
 	}
 	const cryptoKey = await importJWK(key, header.alg);
-	const verified = await jwtVerify(token, cryptoKey);
+	const verified = await jwtVerify(token, cryptoKey, {
+		audience: options?.audience,
+		issuer: options?.issuer,
+	});
 	return verified;
 }
