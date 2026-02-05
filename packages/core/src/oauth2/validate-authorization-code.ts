@@ -1,7 +1,6 @@
 import { base64 } from "@better-auth/utils/base64";
 import { betterFetch } from "@better-fetch/fetch";
-import type { JWK } from "jose";
-import { decodeProtectedHeader, importJWK, jwtVerify } from "jose";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { AwaitableFunction } from "../types";
 import type { ProviderOptions } from "./index";
 import { getOAuth2Tokens } from "./index";
@@ -172,30 +171,8 @@ export async function validateToken(
 		issuer?: string | string[];
 	},
 ) {
-	const { data, error } = await betterFetch<{
-		keys: JWK[];
-	}>(jwksEndpoint, {
-		method: "GET",
-		headers: {
-			accept: "application/json",
-		},
-	});
-	if (error) {
-		throw error;
-	}
-	const keys = data["keys"];
-	const header = decodeProtectedHeader(token);
-	const key = keys.find((k) => k.kid === header.kid);
-	if (!key) {
-		throw new Error("Key not found");
-	}
-	const alg = key.alg || header.alg;
-	if (!alg) {
-		throw new Error("Unable to determine algorithm");
-	}
-	const cryptoKey = await importJWK(key, alg);
-	const verified = await jwtVerify(token, cryptoKey, {
-		algorithms: [alg],
+	const jwks = createRemoteJWKSet(new URL(jwksEndpoint));
+	const verified = await jwtVerify(token, jwks, {
 		audience: options?.audience,
 		issuer: options?.issuer,
 	});

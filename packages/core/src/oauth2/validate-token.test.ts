@@ -1,18 +1,22 @@
+import type { JWK } from "jose";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { validateToken } from "./validate-authorization-code";
 
-vi.mock("@better-fetch/fetch", () => ({
-	betterFetch: vi.fn(),
-}));
-
-import { betterFetch } from "@better-fetch/fetch";
-
-const mockedBetterFetch = vi.mocked(betterFetch);
-
 describe("validateToken", () => {
+	const originalFetch = globalThis.fetch;
+	const mockedFetch = vi.fn() as unknown as typeof fetch & ReturnType<typeof vi.fn>;
+
+	beforeAll(() => {
+		globalThis.fetch = mockedFetch;
+	});
+
+	afterAll(() => {
+		globalThis.fetch = originalFetch;
+	});
+
 	beforeEach(() => {
-		vi.clearAllMocks();
+		mockedFetch.mockReset();
 	});
 
 	async function createTestJWKS(alg: string, crv?: string) {
@@ -24,7 +28,9 @@ describe("validateToken", () => {
 		const privateJWK = await exportJWK(privateKey);
 		const kid = `test-key-${Date.now()}`;
 		publicJWK.kid = kid;
+		publicJWK.alg = alg;
 		privateJWK.kid = kid;
+		privateJWK.alg = alg;
 		return { publicJWK, privateJWK, kid, publicKey, privateKey };
 	}
 
@@ -47,14 +53,19 @@ describe("validateToken", () => {
 			.sign(privateKey);
 	}
 
+	function mockJWKSResponse(...publicJWKs: JWK[]) {
+		mockedFetch.mockResolvedValueOnce(
+			new Response(JSON.stringify({ keys: publicJWKs }), {
+				status: 200,
+				headers: { "content-type": "application/json" },
+			}),
+		);
+	}
+
 	it("should verify RS256 signed token", async () => {
 		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		const result = await validateToken(
 			token,
@@ -64,20 +75,12 @@ describe("validateToken", () => {
 		expect(result).toBeDefined();
 		expect(result.payload.sub).toBe("user-123");
 		expect(result.payload.email).toBe("test@example.com");
-		expect(mockedBetterFetch).toHaveBeenCalledWith(
-			"https://example.com/.well-known/jwks",
-			expect.objectContaining({ method: "GET" }),
-		);
 	});
 
 	it("should verify ES256 signed token", async () => {
 		const { publicJWK, privateKey, kid } = await createTestJWKS("ES256");
 		const token = await createSignedToken(privateKey, "ES256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		const result = await validateToken(
 			token,
@@ -94,11 +97,7 @@ describe("validateToken", () => {
 			"Ed25519",
 		);
 		const token = await createSignedToken(privateKey, "EdDSA", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		const result = await validateToken(
 			token,
@@ -109,19 +108,15 @@ describe("validateToken", () => {
 		expect(result.payload.sub).toBe("user-123");
 	});
 
-	it("should throw 'Key not found' when kid doesn't match", async () => {
+	it("should throw when kid doesn't match any key", async () => {
 		const { publicJWK, privateKey } = await createTestJWKS("RS256");
 		publicJWK.kid = "different-kid";
 		const token = await createSignedToken(privateKey, "RS256", "original-kid");
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		await expect(
 			validateToken(token, "https://example.com/.well-known/jwks"),
-		).rejects.toThrow("Key not found");
+		).rejects.toThrow();
 	});
 
 	it("should find correct key when multiple keys exist", async () => {
@@ -129,11 +124,7 @@ describe("validateToken", () => {
 		const key2 = await createTestJWKS("RS256");
 		const key3 = await createTestJWKS("ES256");
 		const token = await createSignedToken(key2.privateKey, "RS256", key2.kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [key1.publicJWK, key2.publicJWK, key3.publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(key1.publicJWK, key2.publicJWK, key3.publicJWK);
 
 		const result = await validateToken(
 			token,
@@ -147,25 +138,19 @@ describe("validateToken", () => {
 	it("should throw when JWKS returns empty keys array", async () => {
 		const { privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [] },
-			error: null,
-		});
+		mockJWKSResponse();
 
 		await expect(
 			validateToken(token, "https://example.com/.well-known/jwks"),
-		).rejects.toThrow("Key not found");
+		).rejects.toThrow();
 	});
 
 	it("should throw when JWKS fetch fails", async () => {
 		const { privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: null,
-			error: { status: 500, statusText: "Internal Server Error" },
-		});
+		mockedFetch.mockResolvedValueOnce(
+			new Response("Internal Server Error", { status: 500 }),
+		);
 
 		await expect(
 			validateToken(token, "https://example.com/.well-known/jwks"),
@@ -175,11 +160,7 @@ describe("validateToken", () => {
 	it("should verify token with matching audience", async () => {
 		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		const result = await validateToken(
 			token,
@@ -194,11 +175,7 @@ describe("validateToken", () => {
 	it("should reject token with mismatched audience", async () => {
 		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		await expect(
 			validateToken(token, "https://example.com/.well-known/jwks", {
@@ -210,11 +187,7 @@ describe("validateToken", () => {
 	it("should verify token with matching issuer", async () => {
 		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		const result = await validateToken(
 			token,
@@ -229,11 +202,7 @@ describe("validateToken", () => {
 	it("should reject token with mismatched issuer", async () => {
 		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		await expect(
 			validateToken(token, "https://example.com/.well-known/jwks", {
@@ -245,11 +214,7 @@ describe("validateToken", () => {
 	it("should verify token with both audience and issuer", async () => {
 		const { publicJWK, privateKey, kid } = await createTestJWKS("RS256");
 		const token = await createSignedToken(privateKey, "RS256", kid);
-
-		mockedBetterFetch.mockResolvedValueOnce({
-			data: { keys: [publicJWK] },
-			error: null,
-		});
+		mockJWKSResponse(publicJWK);
 
 		const result = await validateToken(
 			token,
