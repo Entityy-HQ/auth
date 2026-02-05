@@ -213,7 +213,31 @@ const authClient = createAuthClient({
         //any better-fetch options
     },
 })
-```         
+```
+
+### Disabling Default Fetch Plugins
+
+By default, the auth client includes a redirect plugin that automatically handles browser redirects (e.g., after social sign-in) by setting `window.location.href`. This works well for browser-based applications but can cause issues in non-browser environments.
+
+You can disable the default fetch plugins by setting `disableDefaultFetchPlugins` to `true`:
+
+```ts title="auth-client.ts"
+import { createAuthClient } from "better-auth/client"
+
+const authClient = createAuthClient({
+    disableDefaultFetchPlugins: true,
+})
+```
+
+This is particularly useful for:
+
+- **React Native / Expo apps**: These environments don't have `window.location`, so automatic redirects won't work. Use this option alongside platform-specific plugins like `expoClient` that handle navigation appropriately.
+- **Custom redirect handling**: If you want full control over how redirects are processed (e.g., using a router's navigation methods instead of `window.location`).
+- **Server-side rendering**: When you need to handle redirects differently on the server.
+
+<Callout type="info">
+When disabling default fetch plugins, make sure you have appropriate handling for redirects if your authentication flow requires them (e.g., OAuth/social login).
+</Callout>         
 
 You can also pass fetch options to most of the client functions. Either as the second argument or as a property in the object.
 
