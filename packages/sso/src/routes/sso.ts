@@ -229,6 +229,7 @@ export const spMetadata = () => {
 							},
 						],
 						wantMessageSigned: parsedSamlConfig.wantAssertionsSigned || false,
+						authnRequestsSigned: parsedSamlConfig.authnRequestsSigned || false,
 						nameIDFormat: parsedSamlConfig.identifierFormat
 							? [parsedSamlConfig.identifierFormat]
 							: undefined,
@@ -390,6 +391,7 @@ const ssoProviderBodySchema = z.object({
 				encPrivateKeyPass: z.string().optional(),
 			}),
 			wantAssertionsSigned: z.boolean().optional(),
+			authnRequestsSigned: z.boolean().optional(),
 			signatureAlgorithm: z.string().optional(),
 			digestAlgorithm: z.string().optional(),
 			identifierFormat: z.string().optional(),
@@ -835,6 +837,7 @@ export const registerSSOProvider = <O extends SSOOptions>(options: O) => {
 								idpMetadata: body.samlConfig.idpMetadata,
 								spMetadata: body.samlConfig.spMetadata,
 								wantAssertionsSigned: body.samlConfig.wantAssertionsSigned,
+								authnRequestsSigned: body.samlConfig.authnRequestsSigned,
 								signatureAlgorithm: body.samlConfig.signatureAlgorithm,
 								digestAlgorithm: body.samlConfig.digestAlgorithm,
 								identifierFormat: body.samlConfig.identifierFormat,
@@ -1266,6 +1269,17 @@ export const signInSSO = (options?: SSOOptions) => {
 					});
 				}
 
+				if (
+					parsedSamlConfig.authnRequestsSigned &&
+					!parsedSamlConfig.spMetadata?.privateKey &&
+					!parsedSamlConfig.privateKey
+				) {
+					ctx.context.logger.warn(
+						"authnRequestsSigned is enabled but no privateKey provided - AuthnRequests will not be signed",
+						{ providerId: provider.providerId },
+					);
+				}
+
 				let metadata = parsedSamlConfig.spMetadata.metadata;
 
 				if (!metadata) {
@@ -1285,6 +1299,8 @@ export const signInSSO = (options?: SSOOptions) => {
 								],
 								wantMessageSigned:
 									parsedSamlConfig.wantAssertionsSigned || false,
+								authnRequestsSigned:
+									parsedSamlConfig.authnRequestsSigned || false,
 								nameIDFormat: parsedSamlConfig.identifierFormat
 									? [parsedSamlConfig.identifierFormat]
 									: undefined,
@@ -1295,6 +1311,10 @@ export const signInSSO = (options?: SSOOptions) => {
 				const sp = saml.ServiceProvider({
 					metadata: metadata,
 					allowCreate: true,
+					privateKey:
+						parsedSamlConfig.spMetadata?.privateKey ||
+						parsedSamlConfig.privateKey,
+					privateKeyPass: parsedSamlConfig.spMetadata?.privateKeyPass,
 				});
 
 				const idp = saml.IdentityProvider({
@@ -1447,7 +1467,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 				throw ctx.redirect(
 					`${
 						errorURL || callbackURL
-					}/error?error=invalid_provider&error_description=provider not found`,
+					}?error=invalid_provider&error_description=provider not found`,
 				);
 			}
 
@@ -1466,7 +1486,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 				throw ctx.redirect(
 					`${
 						errorURL || callbackURL
-					}/error?error=invalid_provider&error_description=provider not found`,
+					}?error=invalid_provider&error_description=provider not found`,
 				);
 			}
 
@@ -1493,7 +1513,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 				throw ctx.redirect(
 					`${
 						errorURL || callbackURL
-					}/error?error=invalid_provider&error_description=token_endpoint_not_found`,
+					}?error=invalid_provider&error_description=token_endpoint_not_found`,
 				);
 			}
 
@@ -1524,7 +1544,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 				throw ctx.redirect(
 					`${
 						errorURL || callbackURL
-					}/error?error=invalid_provider&error_description=token_response_not_found`,
+					}?error=invalid_provider&error_description=token_response_not_found`,
 				);
 			}
 			let userInfo: {
@@ -1541,7 +1561,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 					throw ctx.redirect(
 						`${
 							errorURL || callbackURL
-						}/error?error=invalid_provider&error_description=jwks_endpoint_not_found`,
+						}?error=invalid_provider&error_description=jwks_endpoint_not_found`,
 					);
 				}
 				const verified = await validateToken(
@@ -1555,14 +1575,14 @@ export const callbackSSO = (options?: SSOOptions) => {
 					throw ctx.redirect(
 						`${
 							errorURL || callbackURL
-						}/error?error=invalid_provider&error_description=token_not_verified`,
+						}?error=invalid_provider&error_description=token_not_verified`,
 					);
 				}
 				if (verified.payload.iss !== provider.issuer) {
 					throw ctx.redirect(
 						`${
 							errorURL || callbackURL
-						}/error?error=invalid_provider&error_description=issuer_mismatch`,
+						}?error=invalid_provider&error_description=issuer_mismatch`,
 					);
 				}
 
@@ -1595,7 +1615,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 					throw ctx.redirect(
 						`${
 							errorURL || callbackURL
-						}/error?error=invalid_provider&error_description=user_info_endpoint_not_found`,
+						}?error=invalid_provider&error_description=user_info_endpoint_not_found`,
 					);
 				}
 				const userInfoResponse = await betterFetch<{
@@ -1613,7 +1633,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 					throw ctx.redirect(
 						`${
 							errorURL || callbackURL
-						}/error?error=invalid_provider&error_description=${
+						}?error=invalid_provider&error_description=${
 							userInfoResponse.error.message
 						}`,
 					);
@@ -1625,7 +1645,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 				throw ctx.redirect(
 					`${
 						errorURL || callbackURL
-					}/error?error=invalid_provider&error_description=missing_user_info`,
+					}?error=invalid_provider&error_description=missing_user_info`,
 				);
 			}
 			const isTrustedProvider =
@@ -1659,9 +1679,7 @@ export const callbackSSO = (options?: SSOOptions) => {
 				isTrustedProvider,
 			});
 			if (linked.error) {
-				throw ctx.redirect(
-					`${errorURL || callbackURL}/error?error=${linked.error}`,
-				);
+				throw ctx.redirect(`${errorURL || callbackURL}?error=${linked.error}`);
 			}
 			const { session, user } = linked.data!;
 
@@ -2307,8 +2325,10 @@ export const acsEndpoint = (options?: SSOOptions) => {
 			},
 		},
 		async (ctx) => {
-			const { SAMLResponse, RelayState = "" } = ctx.body;
+			const { SAMLResponse } = ctx.body;
 			const { providerId } = ctx.params;
+			const currentCallbackPath = `${ctx.context.baseURL}/sso/saml2/sp/acs/${providerId}`;
+			const appOrigin = new URL(ctx.context.baseURL).origin;
 
 			const maxResponseSize =
 				options?.saml?.maxResponseSize ?? DEFAULT_MAX_SAML_RESPONSE_SIZE;
@@ -2316,6 +2336,14 @@ export const acsEndpoint = (options?: SSOOptions) => {
 				throw new APIError("BAD_REQUEST", {
 					message: `SAML response exceeds maximum allowed size (${maxResponseSize} bytes)`,
 				});
+			}
+			let relayState: RelayState | null = null;
+			if (ctx.body.RelayState) {
+				try {
+					relayState = await parseRelayState(ctx);
+				} catch {
+					relayState = null;
+				}
 			}
 
 			// If defaultSSO is configured, use it as the provider
@@ -2426,7 +2454,9 @@ export const acsEndpoint = (options?: SSOOptions) => {
 			} catch (error) {
 				if (error instanceof APIError) {
 					const redirectUrl =
-						RelayState || parsedSamlConfig.callbackUrl || ctx.context.baseURL;
+						relayState?.callbackURL ||
+						parsedSamlConfig.callbackUrl ||
+						ctx.context.baseURL;
 					const errorCode =
 						error.body?.code === "SAML_MULTIPLE_ASSERTIONS"
 							? "multiple_assertions"
@@ -2444,7 +2474,7 @@ export const acsEndpoint = (options?: SSOOptions) => {
 				parsedResponse = await sp.parseLoginResponse(idp, "post", {
 					body: {
 						SAMLResponse,
-						RelayState: RelayState || undefined,
+						RelayState: ctx.body.RelayState || undefined,
 					},
 				});
 
@@ -2509,7 +2539,9 @@ export const acsEndpoint = (options?: SSOOptions) => {
 							{ inResponseTo: inResponseToAcs, providerId },
 						);
 						const redirectUrl =
-							RelayState || parsedSamlConfig.callbackUrl || ctx.context.baseURL;
+							relayState?.callbackURL ||
+							parsedSamlConfig.callbackUrl ||
+							ctx.context.baseURL;
 						throw ctx.redirect(
 							`${redirectUrl}?error=invalid_saml_response&error_description=Unknown+or+expired+request+ID`,
 						);
@@ -2528,7 +2560,9 @@ export const acsEndpoint = (options?: SSOOptions) => {
 							`${AUTHN_REQUEST_KEY_PREFIX}${inResponseToAcs}`,
 						);
 						const redirectUrl =
-							RelayState || parsedSamlConfig.callbackUrl || ctx.context.baseURL;
+							relayState?.callbackURL ||
+							parsedSamlConfig.callbackUrl ||
+							ctx.context.baseURL;
 						throw ctx.redirect(
 							`${redirectUrl}?error=invalid_saml_response&error_description=Provider+mismatch`,
 						);
@@ -2543,7 +2577,9 @@ export const acsEndpoint = (options?: SSOOptions) => {
 						{ providerId },
 					);
 					const redirectUrl =
-						RelayState || parsedSamlConfig.callbackUrl || ctx.context.baseURL;
+						relayState?.callbackURL ||
+						parsedSamlConfig.callbackUrl ||
+						ctx.context.baseURL;
 					throw ctx.redirect(
 						`${redirectUrl}?error=unsolicited_response&error_description=IdP-initiated+SSO+not+allowed`,
 					);
@@ -2596,7 +2632,9 @@ export const acsEndpoint = (options?: SSOOptions) => {
 						},
 					);
 					const redirectUrl =
-						RelayState || parsedSamlConfig.callbackUrl || ctx.context.baseURL;
+						relayState?.callbackURL ||
+						parsedSamlConfig.callbackUrl ||
+						ctx.context.baseURL;
 					throw ctx.redirect(
 						`${redirectUrl}?error=replay_detected&error_description=SAML+assertion+has+already+been+used`,
 					);
@@ -2673,7 +2711,9 @@ export const acsEndpoint = (options?: SSOOptions) => {
 					validateEmailDomain(userInfo.email as string, provider.domain));
 
 			const callbackUrl =
-				RelayState || parsedSamlConfig.callbackUrl || ctx.context.baseURL;
+				relayState?.callbackURL ||
+				parsedSamlConfig.callbackUrl ||
+				ctx.context.baseURL;
 
 			const result = await handleOAuthUserInfo(ctx, {
 				userInfo: {
@@ -2724,7 +2764,13 @@ export const acsEndpoint = (options?: SSOOptions) => {
 			});
 
 			await setSessionCookie(ctx, { session, user });
-			throw ctx.redirect(callbackUrl);
+			const safeRedirectUrl = getSafeRedirectUrl(
+				relayState?.callbackURL || parsedSamlConfig.callbackUrl,
+				currentCallbackPath,
+				appOrigin,
+				(url, settings) => ctx.context.isTrustedOrigin(url, settings),
+			);
+			throw ctx.redirect(safeRedirectUrl);
 		},
 	);
 };
