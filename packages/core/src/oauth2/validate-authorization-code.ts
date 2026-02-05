@@ -189,8 +189,13 @@ export async function validateToken(
 	if (!key) {
 		throw new Error("Key not found");
 	}
-	const cryptoKey = await importJWK(key, header.alg);
+	const alg = key.alg || header.alg;
+	if (!alg) {
+		throw new Error("Unable to determine algorithm");
+	}
+	const cryptoKey = await importJWK(key, alg);
 	const verified = await jwtVerify(token, cryptoKey, {
+		algorithms: [alg],
 		audience: options?.audience,
 		issuer: options?.issuer,
 	});
