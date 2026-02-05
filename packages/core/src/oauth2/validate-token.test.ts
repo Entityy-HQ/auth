@@ -1,11 +1,20 @@
 import type { JWK } from "jose";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+	afterAll,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	it,
+	vi,
+} from "vitest";
 import { validateToken } from "./validate-authorization-code";
 
 describe("validateToken", () => {
 	const originalFetch = globalThis.fetch;
-	const mockedFetch = vi.fn() as unknown as typeof fetch & ReturnType<typeof vi.fn>;
+	const mockedFetch = vi.fn() as unknown as typeof fetch &
+		ReturnType<typeof vi.fn>;
 
 	beforeAll(() => {
 		globalThis.fetch = mockedFetch;
