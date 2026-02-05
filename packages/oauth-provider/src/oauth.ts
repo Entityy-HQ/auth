@@ -1,6 +1,7 @@
 import { defineRequestState } from "@better-auth/core/context";
 import { logger } from "@better-auth/core/env";
 import { BetterAuthError } from "@better-auth/core/error";
+import { createPlugin } from "@better-auth/core/utils/create-plugin";
 import {
 	APIError,
 	createAuthEndpoint,
@@ -11,7 +12,6 @@ import {
 import { parseSetCookieHeader } from "better-auth/cookies";
 import { constantTimeEqual, makeSignature } from "better-auth/crypto";
 import { mergeSchema } from "better-auth/db";
-import type { BetterAuthPlugin } from "better-auth/types";
 import * as z from "zod";
 import { authorizeEndpoint } from "./authorize";
 import { consentEndpoint } from "./consent";
@@ -151,7 +151,7 @@ export const oauthProvider = <O extends OAuthOptions<Scope[]>>(options: O) => {
 		);
 	}
 
-	return {
+	return createPlugin({
 		id: "oauth-provider",
 		options: opts as NoInfer<O>,
 		init: (ctx) => {
@@ -1362,5 +1362,5 @@ export const oauthProvider = <O extends OAuthOptions<Scope[]>>(options: O) => {
 					]
 				: []),
 		],
-	} satisfies BetterAuthPlugin;
+	});
 };
